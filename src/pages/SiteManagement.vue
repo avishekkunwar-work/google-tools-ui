@@ -30,12 +30,12 @@
               <td>{{ site.url }}</td>
               <td>{{ site.type }}</td>
               <td>
-                <span class="status-badge" :class="site.status.toLowerCase()">{{ site.status === 'Active' ? 'Active' : 'Inactive' }}</span>
+                <span class="status-badge" :class="site.activeStatus.toLowerCase()">{{ site.activeStatus === 'Active' ? 'Active' : 'Inactive' }}</span>
               </td>
               <td>{{ formatDate(site.created) }}</td>
               <td class="action-cell">
                 <button class="action-btn" @click="editSite(site)">Edit</button>
-                <button class="action-btn delete" @click="toggleSiteStatus(site.id)">{{ site.status === 'Active' ? 'Deactivate' : 'Activate' }}</button>
+                <!-- <button class="action-btn delete" @click="toggleSiteStatus(site.id)">{{ site.activeStatus === 'Active' ? 'Deactivate' : 'Activate' }}</button> -->
               </td>
             </tr>
           </tbody>
@@ -79,7 +79,7 @@
                 <label>Status</label>
                 <div class="toggle-container">
                   <input
-                    v-model="formData.status"
+                    v-model="formData.activeStatus"
                     type="checkbox"
                     id="status-toggle"
                     :true-value="'Active'"
@@ -88,7 +88,7 @@
                   />
                   <label for="status-toggle" class="toggle-label">
                     <span class="toggle-switch"></span>
-                    <span class="toggle-text">{{ formData.status === 'Active' ? 'Active' : 'Inactive' }}</span>
+                    <span class="toggle-text">{{ formData.activeStatus === 'Active' ? 'Active' : 'Inactive' }}</span>
                   </label>
                 </div>
               </div>
@@ -109,107 +109,157 @@
     </div>
   </template>
   
+
   <script setup lang="ts">
-  import { ref } from 'vue'
-  
-  interface Site {
-    id: number
-    name: string
-    url: string
-    type: string
-    status: 'Active' | 'Inactive'
-    description: string
-    created: Date
-  }
-  
-  interface FormData {
-    name: string
-    url: string
-    type: string
-    status: 'Active' | 'Inactive'
-    description: string
-  }
-  
-  const sites = ref<Site[]>([
-    { id: 1, name: 'Main Website', url: 'https://example.com', type: 'Corporate', status: 'Active', description: 'Main company website', created: new Date('2024-01-15') },
-    { id: 2, name: 'Blog Platform', url: 'https://blog.example.com', type: 'Blog', status: 'Active', description: 'Company blog and news', created: new Date('2024-02-10') },
-    { id: 3, name: 'E-commerce Store', url: 'https://shop.example.com', type: 'E-commerce', status: 'Active', description: 'Online store', created: new Date('2024-03-05') },
-    { id: 4, name: 'Staging Site', url: 'https://staging.example.com', type: 'Corporate', status: 'Inactive', description: 'Staging environment', created: new Date('2024-01-20') },
-  ])
-  
-  const showModal = ref(false)
-  const isEditing = ref(false)
-  const editingId = ref<number | null>(null)
-  
-  const formData = ref<FormData>({
-    name: '',
-    url: '',
-    type: '',
-    status: 'Active',
-    description: '',
-  })
-  
-  const openAddModal = () => {
-    isEditing.value = false
-    editingId.value = null
-    formData.value = {
+    import { ref, onMounted } from 'vue'
+    import api from '../api' // your axios instance with token/refresh
+    import { useToast } from 'vue-toastification';
+    const toast = useToast();
+
+    interface Site {
+      id: number
+      name: string
+      url: string
+      type: string
+      activeStatus: 'Active' | 'Inactive'
+      description: string
+      created: Date
+    }
+    
+    interface FormData {
+      name: string
+      url: string
+      type: string
+      activeStatus: 'Active' | 'Inactive'
+      description: string
+    }
+    
+    const sites = ref<Site[]>([])
+    const showModal = ref(false)
+    const isEditing = ref(false)
+    const editingId = ref<number | null>(null)
+    
+    const formData = ref<FormData>({
       name: '',
       url: '',
       type: '',
-      status: 'Active',
+      activeStatus: 'Active',
       description: '',
-    }
-    showModal.value = true
+    })
+    
+    /* ============================
+       GET SITES
+    ============================ */
+    const fetchSites = async () => {
+  try {
+    const res = await api.get('/site?PageNo=1&PageSize=10')
+    const items = res.data?.data || []
+
+    sites.value = items.map((item: any) => ({
+      id: item.webSiteId,
+      name: item.siteName,
+      url: item.url,
+      type: item.siteType,
+      activeStatus: item.activeStatus ? 'Active' : 'Inactive', // fix here
+      description: item.description || '',
+      created: new Date(item.createdDate ?? new Date()),
+    }))
+  } catch (err) {
+    console.error('Failed to load sites', err)
   }
-  
-  const editSite = (site: Site) => {
-    isEditing.value = true
-    editingId.value = site.id
-    formData.value = {
-      name: site.name,
-      url: site.url,
-      type: site.type,
-      status: site.status,
-      description: site.description,
-    }
-    showModal.value = true
-  }
-  
-  const saveSite = () => {
-    if (isEditing.value && editingId.value) {
-      const siteIndex = sites.value.findIndex(s => s.id === editingId.value)
-      if (siteIndex !== -1) {
-        sites.value[siteIndex] = {
-          ...sites.value[siteIndex],
-          ...formData.value,
-        }
+}
+
+    
+    /* ============================
+       ADD / UPDATE SITE
+    ============================ */
+    const saveSite = async () => {
+      const payload = {
+        siteName: formData.value.name,
+        url: formData.value.url,
+        siteType: formData.value.type,
+        description: formData.value.description,
+        isActivated: formData.value.activeStatus === 'Active',
+        webSiteId: editingId.value ?? 0,
       }
-    } else {
-      const newSite: Site = {
-        id: Math.max(...sites.value.map(s => s.id), 0) + 1,
-        ...formData.value,
-        created: new Date(),
+    
+      try {
+        await api.post('/site', payload)
+        await fetchSites()
+        closeModal()
+        toast.success('Site updated successfully!');
+      } catch (err) {
+        toast.error('Failed to save site!');
       }
-      sites.value.push(newSite)
     }
-    closeModal()
-  }
-  
-  const toggleSiteStatus = (id: number) => {
-    const site = sites.value.find(s => s.id === id)
-    if (site) {
-      site.status = site.status === 'Active' ? 'Inactive' : 'Active'
+    
+    /* ============================
+       UI HELPERS
+    ============================ */
+    const openAddModal = () => {
+      isEditing.value = false
+      editingId.value = null
+      formData.value = {
+        name: '',
+        url: '',
+        type: '',
+        activeStatus: 'Active',
+        description: '',
+      }
+      showModal.value = true
     }
-  }
-  
-  const closeModal = () => {
-    showModal.value = false
-  }
-  
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-  }
-  </script>
+    
+    const editSite = (site: Site) => {
+      isEditing.value = true
+      editingId.value = site.id
+      formData.value = {
+        name: site.name,
+        url: site.url,
+        type: site.type,
+        activeStatus: site.activeStatus,
+        description: site.description,
+      }
+      showModal.value = true
+    }
+
+    
+    
+    // const toggleSiteStatus = async (id: number) => {
+    //   const site = sites.value.find((s) => s.id === id)
+    //   if (!site) return
+    
+    //   site.activeStatus = site.activeStatus === 'Active' ? 'Inactive' : 'Active'
+    
+    //   try {
+    //     await api.post('/site', {
+    //       siteName: site.name,
+    //       url: site.url,
+    //       siteType: site.type,
+    //       description: site.description,
+    //       isActivated: site.activeStatus === 'Active',
+    //       webSiteId: site.id,
+    //     })
+    //   } catch (err) {
+    //     console.error(err)
+    //   }
+    // }
+    
+    const closeModal = () => {
+      showModal.value = false
+    }
+    
+    const formatDate = (date: Date) => {
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    }
+    
+    onMounted(fetchSites)
+    </script>
+    
+    
   
   <style scoped>
   .page-container {
