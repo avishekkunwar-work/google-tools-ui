@@ -2,26 +2,22 @@
     <div class="page-container">
       <div class="page-header">
         <router-link to="/crawl-management" class="back-link">← Back to Crawl Management</router-link>
-        <h1>{{ siteName }} - Crawled URLs</h1>
-        <p class="subtitle">URLs found and indexed from the last crawl</p>
+        <h1>{{ siteName }} - {{ siteUrl }}</h1>
+        <p class="subtitle">URLs from the last crawl.</p>
       </div>
   
       <!-- Summary Card -->
       <div class="summary-card">
         <div class="summary-item">
-          <span class="label">Site URL:</span>
-          <span class="value">{{ siteUrl }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="label">Total URLs:</span>
+          <span class="label">Total URLs</span>
           <span class="value">{{ totalUrlCount }}</span>
         </div>
         <div class="summary-item">
-          <span class="label">Successful:</span>
+          <span class="label">Success</span>
           <span class="value success">{{ successCount }}</span>
         </div>
         <div class="summary-item">
-          <span class="label">Failed:</span>
+          <span class="label">Failed</span>
           <span class="value failed">{{ failedCount }}</span>
         </div>
       </div>

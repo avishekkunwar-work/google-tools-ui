@@ -14,10 +14,11 @@ import 'vue-toastification/dist/index.css';
 import Dashboard from "./pages/Dashboard.vue";
 import SiteManagement from "./pages/SiteManagement.vue";
 import Index from "./pages/IndexManagement.vue";
-import Reports from "./pages/Reports.vue";
 import Settings from "./pages/Settings.vue";
 import CrawlManagement from "./pages/CrawlManagement.vue";
 import CrawlDetails from "./pages/CrawlDetails.vue";
+import IndexDetails from "./pages/IndexDetails.vue";
+
 import Login from "./pages/Login.vue";
 
 // Layouts
@@ -30,52 +31,55 @@ import api from './api'; // Axios instance with withCredentials: true
 const routes = [
   { path: "/", redirect: "/dashboard" },
 
-  // PROTECTED ROUTES (DefaultLayout)
   {
     path: "/",
     component: DefaultLayout,
     children: [
-      { path: "dashboard", name: "Dashboard", component: Dashboard, meta: { requiresAuth: true } },
-      { path: "sites", name: "SiteManagement", component: SiteManagement, meta: { requiresAuth: true } },
-      { path: "index", name: "Index", component: Index, meta: { requiresAuth: true } },
-      { path: "reports", name: "Reports", component: Reports, meta: { requiresAuth: true } },
-      { path: "settings", name: "Settings", component: Settings, meta: { requiresAuth: true } },
-      { path: "crawl-management", name: "CrawlManagement", component: CrawlManagement, meta: { requiresAuth: true } },
-      { path: "crawl-details/:siteId", name: "CrawlDetails", component: CrawlDetails, meta: { requiresAuth: true } },
+      { path: "dashboard", component: Dashboard, meta: { requiresAuth: true } },
+      { path: "sites", component: SiteManagement, meta: { requiresAuth: true } },
+      { path: "index", component: Index, meta: { requiresAuth: true } },
+      { path: "index-details/:siteId",name: 'IndexDetails', component: IndexDetails, meta: { requiresAuth: true } },
+
+      {
+        path: "settings",
+        component: Settings,
+        meta: { requiresAuth: true },
+        children: [
+          {
+            path: "google-configuration",
+            name: "GoogleConfiguration",
+            component: () => import("./pages/GoogleConfiguration.vue"),
+            meta: { requiresAuth: true }
+          },
+          {
+            path: "schedule-configuration",
+            name: "ScheduleConfiguration",
+            component: () => import("./pages/ScheduleConfiguration.vue"),
+            meta: { requiresAuth: true }
+          }
+        ]
+      },
+
+      { path: "crawl-management", component: CrawlManagement, meta: { requiresAuth: true } },
+      { path: "crawl-details/:siteId",name: 'CrawlDetails', component: CrawlDetails, meta: { requiresAuth: true } },
     ],
   },
 
-  // PUBLIC ROUTES (AuthLayout)
   {
     path: "/login",
     component: AuthLayout,
-    children: [{ path: "", name: "Login", component: Login, meta: { public: true } }],
+    children: [{ path: "", component: Login, meta: { public: true } }],
   },
-  {
-    path: "/unauthorized",
-    component: AuthLayout,
-    children: [{ path: "", name: "Unauthorized", component: () => import('./pages/Unauthorized.vue'), meta: { public: true } }],
-  },
-  {
-    path: "/not-found",
-    component: AuthLayout,
-    children: [{ path: "", name: "NotFound", component: () => import('./pages/NotFound.vue'), meta: { public: true } }],
-  },
+
+  { path: "/google-callback", component: GoogleCallback },
+
   {
     path: "/:pathMatch(.*)*",
     component: AuthLayout,
-    children: [{ path: "", name: "NotFound", component: () => import('./pages/NotFound.vue'), meta: { public: true } }],
-  },
-
-  { path: '/google-callback', component: GoogleCallback },
-
-  {
-    path: "/register",
-    name: "register",
-    component: () => import("./pages/Register.vue"),
+    children: [{ path: "", component: () => import('./pages/NotFound.vue'), meta: { public: true } }],
   }
-  
 ];
+
 
 const router = createRouter({
   history: createWebHistory(),
@@ -85,7 +89,7 @@ const router = createRouter({
 // ------------------------------------------------------
 //  GLOBAL AUTH GUARD (using server session/cookies)
 // ------------------------------------------------------
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, from0, next) => {
   const isPublic = to.meta.public === true;
   const requiresAuth = to.meta.requiresAuth === true;
 
