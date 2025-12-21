@@ -180,7 +180,7 @@
         siteType: formData.value.type,
         description: formData.value.description,
         isActivated: formData.value.activeStatus === 'Active',
-        webSiteId: editingId.value ?? 0,
+        webSiteId: editingId.value,
       }
     
       try {

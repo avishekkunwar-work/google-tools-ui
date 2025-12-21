@@ -2,12 +2,10 @@
   <div class="page-container">
     <!-- Header -->
     <div class="page-header">
-      <div>
-        <h1>Welcome back!</h1>
-        <p class="subtitle">
-          Configure credentials for Google Search Console and Indexing API
-        </p>
-      </div>
+      <h1>Welcome back!</h1>
+      <p class="subtitle">
+        Configure credentials for Google Search Console and Indexing API
+      </p>
     </div>
 
     <!-- Content Grid -->
@@ -18,23 +16,21 @@
         <div class="card">
           <h3>Current Status</h3>
 
-          <div class="status-box success">
+          <div class="status-box success" v-if="credentials.serviceAccountEmail">
             <div>
               <strong>Service Account:</strong><br />
-              <span class="mono">
-                proline-console-for-indexing@proline-v3-1668135748790.iam.gserviceaccount.com
-              </span>
+              <span class="mono">{{ credentials.serviceAccountEmail }}</span>
             </div>
 
-            <div class="status-meta">
-              <span>Last Updated: 3/17/2025 2:22 AM</span>
-              <span>Last Tested: Never</span>
-            </div>
+          </div>
+          <div class="status-box" v-else>
+            <span>No credentials uploaded</span>
           </div>
 
           <div class="actions">
-            <button class="btn danger">Remove Credentials</button>
-            <button class="btn primary">Test Credentials</button>
+            <button class="btn danger" @click="removeCredentials" :disabled="loading">
+              Remove Credentials
+            </button>
           </div>
         </div>
 
@@ -45,10 +41,12 @@
             Upload a Google service account JSON key file to enable URL indexing functionality.
           </p>
 
-          <input type="file" class="file-input" />
+          <input type="file" class="file-input" @change="handleFileChange" />
 
           <div class="actions">
-            <button class="btn primary">Upload Key</button>
+            <button class="btn primary" @click="uploadKey" :disabled="loading">
+              Upload Key
+            </button>
           </div>
 
           <div class="info">
@@ -70,52 +68,186 @@
 
           <div class="form-group">
             <label>Client ID</label>
-            <input type="text" />
-          </div>
-
-          <div class="form-group">
-            <label>Client Secret</label>
-            <input type="password" />
+            <input type="text" v-model="credentials.clientId" />
           </div>
 
           <div class="form-group">
             <label>Project ID</label>
-            <input type="text" />
+            <input type="text" v-model="credentials.projectId" />
           </div>
 
           <div class="form-group">
             <label>Service Account Email</label>
-            <input type="email" />
+            <input type="email" v-model="credentials.serviceAccountEmail" />
+          </div>
+
+          <div class="form-group">
+            <label>Private Key ID</label>
+            <input type="text" v-model="credentials.privateKeyId" />
           </div>
 
           <div class="form-group">
             <label>Private Key</label>
-            <textarea rows="6"></textarea>
+            <textarea rows="6" v-model="credentials.privateKey"></textarea>
           </div>
 
-          <button class="btn primary full">Save Credentials</button>
+          <button class="btn primary full" @click="updateCredentials" :disabled="loading">
+            Update Credentials
+          </button>
         </div>
       </div>
     </div>
+
+    <!-- Error Message -->
+    <!-- <p v-if="error" style="color: red; margin-top: 12px">{{ error }}</p> -->
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue'
+import api from '../api' // your Axios instance
+import { useToast } from 'vue-toastification';
+const toast = useToast();
+const loading = ref(false)
+const error = ref<string | null>(null)
+const selectedFile = ref<File | null>(null)
+
+// Reactive credentials object
+const credentials = reactive({
+  clientId: '',
+  projectId: '',
+  serviceAccountEmail: '',
+  privateKey: '',
+  privateKeyId: '',
+  lastUpdated: ''})
+
+// Fetch existing credentials
+const fetchCredentials = async () => {
+  loading.value = true
+  error.value = null
+  try {
+    const res = await api.get('/google-config/get')
+    const data = res.data?.data
+    if (data) {
+      credentials.clientId = data.clientId || ''
+      credentials.projectId = data.projectId || ''
+      credentials.serviceAccountEmail = data.clientEmail || ''
+      credentials.privateKey = data.privateKey || ''
+      credentials.privateKeyId = data.privateKeyId || ''
+      credentials.lastUpdated = data.lastUpdated || ''
+    }
+  } catch (err: any) {
+    console.error(err)
+    error.value = err.message || 'Failed to fetch credentials'
+  } finally {
+    loading.value = false
+  }
+}
+
+// Handle file selection
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    selectedFile.value = target.files[0]
+  }
+}
+
+// Upload JSON key
+const uploadKey = async () => {
+  if (!selectedFile.value) {
+    toast.error('Please select a JSON file first');
+    return;
+  }
+  loading.value = true
+  error.value = null
+  try {
+    const formData = new FormData()
+    formData.append('file', selectedFile.value)
+    await api.post('/google-config/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    toast.success('Service account key uploaded successfully!');
+
+    await fetchCredentials()
+  } catch (err: any) {
+    console.error(err)
+    error.value = err.message || 'Failed to upload key'
+  } finally {
+    loading.value = false
+  }
+}
+
+
+// Remove credentials
+const removeCredentials = async () => {
+  if (!confirm('Are you sure you want to remove credentials?')) return
+  loading.value = true
+  error.value = null
+  try {
+    await api.post('/google-config/remove')
+    toast.success('Credentials removed successfully!');
+    Object.assign(credentials, {
+      clientId: '',
+      projectId: '',
+      serviceAccountEmail: '',
+      privateKey: '',
+      privateKeyId: '',
+      lastUpdated: ''
+    })
+  } catch (err: any) {
+    console.error(err)
+    error.value = err.message || 'Failed to remove credentials'
+  } finally {
+    loading.value = false
+  }
+}
+
+// Update credentials (update API)
+const updateCredentials = async () => {
+  loading.value = true
+  error.value = null
+  try {
+    await api.post('/google-config/update', {
+      clientId: credentials.clientId,
+      projectId: credentials.projectId,
+      clientEmail: credentials.serviceAccountEmail,
+      privateKey: credentials.privateKey,
+      privateKeyId: credentials.privateKeyId
+    })
+    toast.success('Credentials updated successfully!');
+    credentials.lastUpdated = new Date().toLocaleString()
+  } catch (err: any) {
+    console.error(err)
+    error.value = err.message || 'Failed to update credentials'
+  } finally {
+    loading.value = false
+  }
+}
+
+// Fetch credentials on mount
+onMounted(() => {
+  fetchCredentials()
+})
 </script>
 
 <style scoped>
+/* Keep all your previous styles */
 .page-container {
-  flex: 1;
+  min-height: 100vh;
   padding: 30px;
   background: #f5f6f8;
-  overflow-y: auto;
 }
 
 /* Header */
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .page-header h1 {
   font-size: 28px;
   font-weight: 700;
-  margin-bottom: 6px;
 }
 
 .subtitle {
@@ -151,7 +283,7 @@
   font-weight: 600;
 }
 
-/* Status */
+/* Status Box */
 .status-box {
   padding: 12px;
   border-radius: 6px;
@@ -166,6 +298,7 @@
 .mono {
   font-family: monospace;
   font-size: 13px;
+  word-break: break-all;
 }
 
 .status-meta {
@@ -184,7 +317,6 @@
   flex-wrap: wrap;
 }
 
-/* Buttons */
 .btn {
   padding: 8px 14px;
   border-radius: 6px;
@@ -203,17 +335,11 @@
   color: #fff;
 }
 
-.btn.outline {
-  background: #fff;
-  border: 1px solid #d1d5db;
-  color: #374151;
-}
-
 .btn.full {
   width: 100%;
 }
 
-/* Inputs */
+/* Forms */
 .form-group {
   display: flex;
   flex-direction: column;
@@ -232,6 +358,13 @@ textarea {
   border-radius: 6px;
   border: 1px solid #d1d5db;
   font-size: 13px;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.4);
 }
 
 .file-input {
@@ -253,5 +386,26 @@ textarea {
 
 .info h4 {
   margin-bottom: 6px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-container {
+    padding: 14px;
+  }
+
+  .page-header h1 {
+    font-size: 20px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+  }
 }
 </style>
