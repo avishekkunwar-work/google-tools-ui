@@ -81,10 +81,13 @@
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
+// ✅ Updated to include "Queue"
+type StatusType = 'Success' | 'Failed' | 'Queue'
+
 interface CrawledUrl {
   id: number
   url: string
-  status: 'Success' | 'Failed'
+  status: StatusType
   statusCode: number
   crawledAt: Date
 }
@@ -101,6 +104,7 @@ const route = useRoute()
 const currentPage = ref(1)
 const itemsPerPage = 10
 
+// Sample data
 const sitesData: SiteData[] = [
   {
     id: 1,
@@ -146,7 +150,6 @@ const allUrls = computed(() => siteData.value?.urls || [])
 const successCount = computed(() => allUrls.value.filter(u => u.status === 'Success').length)
 const failedCount = computed(() => allUrls.value.filter(u => u.status === 'Failed').length)
 const totalUrlCount = computed(() => allUrls.value.length)
-
 const totalPages = computed(() => Math.ceil(allUrls.value.length / itemsPerPage))
 
 const paginatedUrls = computed(() => {
@@ -154,8 +157,8 @@ const paginatedUrls = computed(() => {
   return allUrls.value.slice(start, start + itemsPerPage)
 })
 
-const getUrlRowClass = (status: string) => status.toLowerCase()
-const getUrlStatusClass = (status: string) => status.toLowerCase()
+const getUrlRowClass = (status: StatusType) => status.toLowerCase()
+const getUrlStatusClass = (status: StatusType) => status.toLowerCase()
 
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
 const previousPage = () => { if (currentPage.value > 1) currentPage.value-- }
@@ -170,7 +173,7 @@ const formatDate = (date: Date) => {
   })
 }
 
-// Re-Index button handler
+// ✅ Re-Index button handler (status now allows "Queue")
 const reIndex = (urlId: number) => {
   const url = allUrls.value.find(u => u.id === urlId)
   if (url) {
@@ -179,6 +182,7 @@ const reIndex = (urlId: number) => {
   }
 }
 </script>
+
 
 <style scoped>
 /* Styles mostly same as your previous version with minor adjustments for Actions button */

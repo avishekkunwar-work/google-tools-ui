@@ -75,7 +75,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import { login as apiLogin, redirectToGoogleLogin } from "../store/auth";
+import { login as apiLogin, redirectToGoogleLogin } from "../Store/auth";
 import RegisterModal from "../pages/Register.vue";
 
 const router = useRouter();

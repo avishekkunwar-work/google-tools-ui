@@ -52,7 +52,7 @@
   
   <script setup>
   import { ref, defineProps, defineEmits } from "vue";
-  import { register as apiRegister } from "../store/auth";
+  import { register as apiRegister } from "../Store/auth";
   import { useToast } from "vue-toastification";
   
   const props = defineProps({ show: Boolean });

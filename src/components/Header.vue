@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { logout,useAuthStore } from '../store/auth'; // use alias for cleaner path
+import { logout,useAuthStore } from '../Store/auth'; // use alias for cleaner path
 
 const authStore = useAuthStore();
 

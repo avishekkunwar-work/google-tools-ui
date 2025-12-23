@@ -156,11 +156,13 @@ const fetchCredentials = async () => {
 }
 
 const handleFileChange = (e: Event) => {
-  const input = e.target as HTMLInputElement
-  if (input.files?.length) {
-    selectedFile.value = input.files[0]
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0]; // safely get first file
+  if (file) {
+    selectedFile.value = file; // now TypeScript knows it's not undefined
   }
-}
+};
+
 
 const uploadKey = async () => {
   if (!selectedFile.value) {

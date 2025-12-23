@@ -90,7 +90,7 @@ const router = createRouter({
 // ------------------------------------------------------
 //  GLOBAL AUTH GUARD (using server session/cookies)
 // ------------------------------------------------------
-router.beforeEach(async (to, from0, next) => {
+router.beforeEach(async (to, _, next) => {
   const isPublic = to.meta.public === true;
   const requiresAuth = to.meta.requiresAuth === true;
 

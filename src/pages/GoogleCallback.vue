@@ -5,7 +5,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { loginWithGoogle } from "../store/auth"; // <-- import the helper
+import { loginWithGoogle } from "../Store/auth"; // <-- import the helper
 
 const router = useRouter();
 
