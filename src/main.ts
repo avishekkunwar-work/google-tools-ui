@@ -27,6 +27,7 @@ import AuthLayout from "./layout/AuthLayout.vue";
 
 // Axios instance
 import api from './api'; // Axios instance with withCredentials: true
+import { createPinia } from 'pinia';
 
 const routes = [
   { path: "/", redirect: "/dashboard" },
@@ -119,8 +120,12 @@ router.beforeEach(async (to, from0, next) => {
   next();
 });
 
+const pinia = createPinia();
 
 const app = createApp(App);
+
+app.use(pinia);     // ✅ THIS IS REQUIRED
+
 app.use(router);
 
 // Add toastification

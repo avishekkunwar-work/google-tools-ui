@@ -1,186 +1,204 @@
 <template>
-    <div class="page-container">
-      <div class="page-header">
-        <router-link to="/crawl-management" class="back-link">← Back to Crawl Management</router-link>
-        <h1>{{ siteName }} - {{ siteUrl }}</h1>
-        <p class="subtitle">URLs from the last crawl.</p>
-      </div>
-  
-      <!-- Summary Card -->
-      <div class="summary-card">
-        <div class="summary-item">
-          <span class="label">Total URLs</span>
-          <span class="value">{{ totalUrlCount }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="label">Success</span>
-          <span class="value success">{{ successCount }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="label">Failed</span>
-          <span class="value failed">{{ failedCount }}</span>
-        </div>
-      </div>
-  
-      <!-- URLs Table with Pagination -->
-      <div class="table-card">
-        <table class="urls-table">
-          <thead>
-            <tr>
-              <th>URL</th>
-              <th>Status</th>
-              <th>Status Code</th>
-              <th>Crawled At</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="url in paginatedUrls" :key="url.id" :class="getUrlRowClass(url.status)">
-              <td class="url-cell">
-                <a :href="url.url" target="_blank" rel="noopener noreferrer">{{ url.url }}</a>
-              </td>
-              <td>
-                <span class="status-badge" :class="getUrlStatusClass(url.status)">
-                  {{ url.status }}
-                </span>
-              </td>
-              <td class="status-code">{{ url.statusCode }}</td>
-              <td>{{ formatDate(url.crawledAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
-  
-        <!-- Pagination -->
-        <div class="pagination">
-          <button 
-            @click="previousPage" 
-            :disabled="currentPage === 1"
-            class="pagination-btn"
+  <div class="page-container">
+    <div class="page-header">
+      <router-link to="/crawl-management" class="back-link">
+        ← Back to Crawl Management
+      </router-link>
+
+      <h1>Crawl Details</h1>
+      <p class="subtitle">URLs from the last crawl</p>
+    </div>
+
+    <div class="summary-card">
+  <div class="summary-item">
+    <span class="label">Total URLs</span>
+    <span class="value">{{ totalUrlCount }}</span>
+  </div>
+  <div class="summary-item">
+    <span class="label">Success</span>
+    <span class="value success">{{ successCount }}</span>
+  </div>
+  <div class="summary-item">
+    <span class="label">Failed</span>
+    <span class="value failed">{{ failedCount }}</span>
+  </div>
+</div>
+
+
+    <!-- Table -->
+    <div class="table-card">
+      <table class="urls-table">
+        <thead>
+          <tr>
+            <th>URL</th>
+            <th>Status</th>
+            <th>Status Code</th>
+            <th>Crawled At</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr
+            v-for="(item, index) in urls"
+            :key="index"
+            :class="item.status.toLowerCase()"
           >
-            Previous
-          </button>
-          <div class="pagination-info">
-            Page {{ currentPage }} of {{ totalPages }} ({{ totalUrlCount }} total URLs)
-          </div>
-          <button 
-            @click="nextPage" 
-            :disabled="currentPage === totalPages"
-            class="pagination-btn"
-          >
-            Next
-          </button>
+            <td class="url-cell">
+              <a :href="item.url" target="_blank">{{ item.url }}</a>
+            </td>
+
+            <td>
+              <span
+                class="status-badge"
+                :class="item.status.toLowerCase()"
+              >
+                {{ item.status }}
+              </span>
+            </td>
+
+            <td class="status-code">{{ item.statusCode }}</td>
+            <td>{{ item.crawledAt }}</td>
+          </tr>
+
+          <tr v-if="urls.length === 0">
+            <td colspan="4" style="text-align:center; padding:20px">
+              No crawl data found
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <button
+          class="pagination-btn"
+          :disabled="!pageInfo.hasPreviousPage"
+          @click="previousPage"
+        >
+          Previous
+        </button>
+
+        <div class="pagination-info">
+          Page {{ pageInfo.page }} of {{ totalPages }}
+          ({{ totalUrlCount }} URLs)
         </div>
+
+        <button
+          class="pagination-btn"
+          :disabled="!pageInfo.hasNextPage"
+          @click="nextPage"
+        >
+          Next
+        </button>
       </div>
     </div>
-  </template>
-  
-  <script setup lang="ts">
-  import { ref, computed } from 'vue'
+  </div>
+</template>
+
+<script setup lang="ts">
+  import { ref, computed, onMounted, watch } from 'vue'
   import { useRoute } from 'vue-router'
+  import api from '../api' // axios instance
+  
+  interface CrawlCount {
+    totalCount: number
+    successCount: number
+    failedCount: number
+  }
   
   interface CrawledUrl {
-    id: number
     url: string
     status: 'Success' | 'Failed'
     statusCode: number
-    crawledAt: Date
+    crawledAt: string
   }
   
-  interface SiteData {
-    id: number
-    name: string
-    url: string
-    type: string
-    urls: CrawledUrl[]
+  interface PageInfo {
+    page: number
+    pageSize: number
+    totalCount: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
   }
   
   const route = useRoute()
-  const currentPage = ref(1)
-  const itemsPerPage = 10
+  const siteId = Number(route.params.siteId)
   
-  const sitesData: SiteData[] = [
-    {
-      id: 1,
-      name: 'Main Website',
-      url: 'https://example.com',
-      type: 'Corporate',
-      urls: [
-        { id: 1, url: 'https://example.com/', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:30') },
-        { id: 2, url: 'https://example.com/about', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:31') },
-        { id: 3, url: 'https://example.com/services', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:32') },
-        { id: 4, url: 'https://example.com/contact', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:33') },
-        { id: 5, url: 'https://example.com/blog', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:34') },
-        { id: 6, url: 'https://example.com/blog/post-1', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:35') },
-        { id: 7, url: 'https://example.com/blog/post-2', status: 'Failed', statusCode: 404, crawledAt: new Date('2024-12-08 10:36') },
-        { id: 8, url: 'https://example.com/products', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:37') },
-        { id: 9, url: 'https://example.com/products/item-1', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:38') },
-        { id: 10, url: 'https://example.com/products/item-2', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:39') },
-        { id: 11, url: 'https://example.com/products/item-3', status: 'Failed', statusCode: 500, crawledAt: new Date('2024-12-08 10:40') },
-        { id: 12, url: 'https://example.com/login', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-08 10:41') },
-      ],
-    },
-    {
-      id: 2,
-      name: 'Blog Platform',
-      url: 'https://blog.example.com',
-      type: 'Blog',
-      urls: [
-        { id: 1, url: 'https://blog.example.com/', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-07 09:00') },
-        { id: 2, url: 'https://blog.example.com/posts', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-07 09:01') },
-        { id: 3, url: 'https://blog.example.com/posts/1', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-07 09:02') },
-        { id: 4, url: 'https://blog.example.com/posts/2', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-07 09:03') },
-        { id: 5, url: 'https://blog.example.com/author', status: 'Success', statusCode: 200, crawledAt: new Date('2024-12-07 09:04') },
-      ],
-    },
-  ]
-  
-  const siteId = parseInt(route.params.siteId as string)
-  const siteData = computed(() => sitesData.find(s => s.id === siteId))
-  const siteName = computed(() => siteData.value?.name || 'Unknown Site')
-  const siteUrl = computed(() => siteData.value?.url || '')
-  const allUrls = computed(() => siteData.value?.urls || [])
-  
-  const successCount = computed(() => allUrls.value.filter(u => u.status === 'Success').length)
-  const failedCount = computed(() => allUrls.value.filter(u => u.status === 'Failed').length)
-  const totalUrlCount = computed(() => allUrls.value.length)
-  
-  const totalPages = computed(() => Math.ceil(allUrls.value.length / itemsPerPage))
-  
-  const paginatedUrls = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage
-    return allUrls.value.slice(start, start + itemsPerPage)
+  const urls = ref<CrawledUrl[]>([])
+  const counts = ref<CrawlCount>({
+    totalCount: 0,
+    successCount: 0,
+    failedCount: 0,
   })
   
-  const getUrlRowClass = (status: string) => {
-    return status.toLowerCase()
-  }
+  const pageInfo = ref<PageInfo>({
+    page: 1,
+    pageSize: 10,
+    totalCount: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  })
   
-  const getUrlStatusClass = (status: string) => {
-    return status.toLowerCase()
-  }
-  
-  const nextPage = () => {
-    if (currentPage.value < totalPages.value) {
-      currentPage.value++
+  /* ================= API CALLS ================= */
+  const fetchCrawlDetails = async () => {
+    try {
+      const res = await api.get(
+        `/crawl/${siteId}/details?PageNo=${pageInfo.value.page}&PageSize=${pageInfo.value.pageSize}`
+      )
+      urls.value = res.data.data
+      pageInfo.value = res.data.pageInfo
+    } catch (err) {
+      console.error('Failed to fetch crawl details', err)
     }
+  }
+  
+  const fetchCrawlCounts = async () => {
+    try {
+      const res = await api.get(`/crawl/${siteId}/details-count`)
+      counts.value = res.data.data
+    } catch (err) {
+      console.error('Failed to fetch crawl counts', err)
+    }
+  }
+  
+  /* ================= LIFECYCLE ================= */
+  onMounted(() => {
+    fetchCrawlDetails()
+    fetchCrawlCounts()
+  })
+  
+  watch(() => pageInfo.value.page, fetchCrawlDetails)
+  
+  /* ================= COMPUTED ================= */
+  const totalUrlCount = computed(() => counts.value.totalCount)
+  const successCount = computed(() => counts.value.successCount)
+  const failedCount = computed(() => counts.value.failedCount)
+  
+  const totalPages = computed(() =>
+    Math.ceil(counts.value.totalCount / pageInfo.value.pageSize)
+  )
+  
+  /* ================= PAGINATION ================= */
+  const nextPage = () => {
+    if (pageInfo.value.hasNextPage) pageInfo.value.page++
   }
   
   const previousPage = () => {
-    if (currentPage.value > 1) {
-      currentPage.value--
-    }
+    if (pageInfo.value.hasPreviousPage) pageInfo.value.page--
   }
   
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
+  /* ================= UTILITIES ================= */
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
   }
   </script>
-  
+
   <style scoped>
   .page-container {
     flex: 1;
@@ -303,7 +321,7 @@
   }
   
   .url-cell a {
-    color: #22c55e;
+    /* color: #22c55e; */
     text-decoration: none;
     word-break: break-word;
   }

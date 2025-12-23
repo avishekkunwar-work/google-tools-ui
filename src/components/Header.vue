@@ -4,8 +4,9 @@
 
     <div class="header-right">
       <div class="profile-actions">
-        <span class="user-avatar" title="Avishek">A</span>
-
+        <span class="user-avatar" :title="authStore.userEmail">
+  {{ authStore.userName.charAt(0).toUpperCase() }}
+</span>{{ authStore.userName }}
         <!-- Logout Icon next to Account -->
         <button class="logout-btn" @click="handleLogout" title="Logout">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon-logout" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -19,7 +20,9 @@
 </template>
 
 <script setup lang="ts">
-import { logout } from '../store/auth'; // use alias for cleaner path
+import { logout,useAuthStore } from '../store/auth'; // use alias for cleaner path
+
+const authStore = useAuthStore();
 
 const handleLogout = () => {
   logout(); // calls auth.ts logout function

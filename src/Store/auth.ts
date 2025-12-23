@@ -3,6 +3,38 @@ import { useToast } from 'vue-toastification';
 import api from '../api';
 const toast = useToast();
 
+import { defineStore } from 'pinia';
+
+export const useAuthStore = defineStore('auth', {
+  state: () => ({
+    user: JSON.parse(sessionStorage.getItem('user') || 'null') as User | null,
+  }),
+
+  getters: {
+    userName: (state) => state.user?.name ?? '',
+    userEmail: (state) => state.user?.email ?? '',
+    isLoggedIn: (state) => !!state.user,
+  },
+
+  actions: {
+    setUser(user: User) {
+      this.user = user;
+      sessionStorage.setItem('user', JSON.stringify(user));
+    },
+
+    clearUser() {
+      this.user = null;
+      sessionStorage.removeItem('user');
+    },
+  },
+});
+
+
+export interface User {
+  name: string;
+  email: string;
+}
+
 interface LoginPayload {
   userName: string;
   password: string;
@@ -17,11 +49,19 @@ interface RegisterPayload {
 // Login function — router passed from component
 export async function login(payload: LoginPayload, router: any): Promise<boolean> {
   try {
-    await api.post('/login', payload, { withCredentials: true });
+    const response = await api.post('/login', payload, { withCredentials: true });
+
+    // ✅ CORRECT PATH
+    const userData = response.data.data;
+
+    const authStore = useAuthStore();
+    authStore.setUser({
+      name: userData.name,
+      email: userData.email,
+    });
 
     toast.success('Welcome! Login successful!');
-
-    await router.push('/dashboard'); // use router passed in
+    await router.push('/dashboard');
     return true;
 
   } catch (err) {
@@ -29,6 +69,7 @@ export async function login(payload: LoginPayload, router: any): Promise<boolean
     return false;
   }
 }
+
 
 
 // -----------------------------
@@ -60,6 +101,8 @@ export async function logout(): Promise<void> {
     console.warn('Logout request failed.');
   }
 
+  const authStore = useAuthStore();
+  authStore.clearUser();
   // Hard redirect
   window.location.href = '/login';
 }
@@ -81,4 +124,36 @@ export function redirectToGoogleLogin(): void {
   const scope = encodeURIComponent('openid email profile');
   const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
   window.location.href = googleUrl;
+}
+
+// In auth.ts
+
+export async function loginWithGoogle(code: string, router: any): Promise<boolean> {
+  const toast = useToast();
+  try {
+    // Send the code to your backend
+    const response = await api.post('/google-login', null, { params: { code }, withCredentials: true });
+
+    const userData = response.data.data; // make sure backend returns { name, email }
+
+    // Save in authStore (same as normal login)
+    const authStore = useAuthStore();
+    authStore.setUser({
+      name: userData.name,
+      email: userData.email,
+    });
+
+    // Optional: save tokens if your backend returns them
+    if (response.data.accessToken) localStorage.setItem('accessToken', response.data.accessToken);
+    if (response.data.refreshToken) localStorage.setItem('refreshToken', response.data.refreshToken);
+
+    toast.success('Welcome! Login successful!');
+    await router.push('/dashboard');
+    return true;
+  } catch (err) {
+    console.error(err);
+    toast.error('Google login failed! Please try again.');
+    await router.push('/login');
+    return false;
+  }
 }
