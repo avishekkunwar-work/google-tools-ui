@@ -1,5 +1,6 @@
 <template>
   <div class="page-container">
+
     <!-- Header -->
     <div class="page-header">
       <div>
@@ -20,28 +21,22 @@
     <div class="stats-cards">
       <div class="stat-card">
         <p class="stat-label">Total Active Sites</p>
-        <p class="stat-value total">{{ activeSites.length }}</p>
+        <p class="stat-value total">{{ stats.activeSiteCount }}</p>
       </div>
 
       <div class="stat-card">
         <p class="stat-label">Queued</p>
-        <p class="stat-value queued">
-          {{ allSites.filter(s => s.crawlStatus === 'Queue').length }}
-        </p>
+        <p class="stat-value queued">{{ stats.queuedCount }}</p>
       </div>
 
       <div class="stat-card">
         <p class="stat-label">Crawled</p>
-        <p class="stat-value indexed">
-          {{ allSites.filter(s => s.crawlStatus === 'Success').length }}
-        </p>
+        <p class="stat-value indexed">{{ stats.crawledCount }}</p>
       </div>
 
       <div class="stat-card">
         <p class="stat-label">Failed</p>
-        <p class="stat-value failed">
-          {{ allSites.filter(s => s.crawlStatus === 'Failed').length }}
-        </p>
+        <p class="stat-value failed">{{ stats.failedCount }}</p>
       </div>
     </div>
 
@@ -67,6 +62,7 @@
             <th>URL</th>
             <th>Type</th>
             <th>Status</th>
+            <th>Indexable</th>
             <th>Crawl Date</th>
             <th>Actions</th>
           </tr>
@@ -103,12 +99,11 @@
               </span>
             </td>
 
+            <td>{{ site.isIndexable }}</td>
             <td>{{ formatCrawlDate(site.crawlDate) }}</td>
 
             <td class="action-cell">
-              <button class="action-btn" @click="startCrawl(site.id)">
-                Crawl
-              </button>
+              <button class="action-btn" @click="startCrawl(site.id)">Crawl</button>
               <button class="action-btn view-details" @click="viewDetails(site.id)">
                 View
               </button>
@@ -116,147 +111,169 @@
           </tr>
 
           <tr v-if="activeSites.length === 0">
-            <td colspan="7" style="text-align:center; padding:20px">
+            <td colspan="8" style="text-align:center; padding:20px">
               No sites found
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
-  import { ref, computed, onMounted } from 'vue'
-  import { useRouter } from 'vue-router'
-  import api from '../api' // your axios instance with token/refresh
-  import { useToast } from 'vue-toastification';
-  const toast = useToast();
-  interface Site {
-    id: number
-    name: string
-    url: string
-    type: string
-    status: 'Active' | 'Inactive'
-    crawlStatus?: 'Success' | 'Failed' | 'Queue'
-    crawlDate?: Date
-  }
-  
-  const router = useRouter()
-  const allSites = ref<Site[]>([])
-  const selectedSites = ref<number[]>([])
-  
-  /* ================= API ================= */
-  const fetchCrawlSites = async () => {
-    try {
-      const res = await api.get('/crawl/site-list?PageNo=1&PageSize=10')
-      const items = res.data?.data || []
-  
-      allSites.value = items.map((item: any) => ({
-        id: item.webSiteId,
-        name: item.siteName,
-        url: item.url,
-        type: item.siteType,
-        status: 'Active',
-        crawlStatus: item.crawlStatus || 'Queue',
-        crawlDate: item.crawlCompletedDate
-          ? new Date(item.crawlCompletedDate)
-          : undefined,
-      }))
-    } catch (err) {
-      console.error('Failed to fetch crawl sites', err)
-    }
-  }
-  
-  onMounted(fetchCrawlSites)
-  
-  /* ================= COMPUTED ================= */
-  const activeSites = computed(() =>
-    allSites.value.filter(s => s.status === 'Active')
-  )
-  
-  const isAllSelected = computed(() =>
-    activeSites.value.length > 0 &&
-    selectedSites.value.length === activeSites.value.length
-  )
-  
-  /* ================= METHODS ================= */
-  const toggleSelectAll = () => {
-    selectedSites.value = isAllSelected.value
-      ? []
-      : activeSites.value.map(s => s.id)
-  }
-  
-  const toggleSiteSelection = (id: number) => {
-    const idx = selectedSites.value.indexOf(id)
-    idx > -1 ? selectedSites.value.splice(idx, 1) : selectedSites.value.push(id)
-  }
-  
-  /* ================= CRAWL API ================= */
-  const queueForCrawl = async () => {
-  if (selectedSites.value.length === 0) return
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '../api'
+import { useToast } from 'vue-toastification'
 
-  const confirmQueue = confirm(
-    `Are you sure you want to queue ${selectedSites.value.length} site(s) for crawl?`
-  )
-  if (!confirmQueue) return
+const toast = useToast()
+const router = useRouter()
+
+interface Site {
+  id: number
+  name: string
+  url: string
+  type: string
+  status: 'Active' | 'Inactive'
+  crawlStatus?: 'Success' | 'Failed' | 'Queue'
+  crawlDate?: Date
+  isIndexable: 'Yes' | 'No'
+}
+
+/* ================= STATE ================= */
+const allSites = ref<Site[]>([])
+const selectedSites = ref<number[]>([])
+
+const stats = ref({
+  activeSiteCount: 0,
+  queuedCount: 0,
+  crawledCount: 0,
+  failedCount: 0
+})
+
+/* ================= API ================= */
+const handleAuthError = (err: any) => {
+  if (err?.response?.status === 400 || err?.response?.status === 401) {
+    toast.error('Session expired. Please login again.')
+    router.push({ name: 'Login' })
+  }
+}
+
+/* Fetch site list */
+const fetchCrawlSites = async () => {
+  try {
+    const res = await api.get('/crawl/site-list?PageNo=1&PageSize=10')
+    const items = res.data?.data || []
+
+    allSites.value = items.map((item: any) => ({
+      id: item.webSiteId,
+      name: item.siteName,
+      url: item.url,
+      type: item.siteType,
+      status: 'Active',
+      crawlStatus: item.crawlStatus || 'Queue',
+      isIndexable: item.isIndexable ? 'Yes' : 'No',
+      crawlDate: item.crawlCompletedDate
+        ? new Date(item.crawlCompletedDate)
+        : undefined
+    }))
+  } catch (err) {
+    handleAuthError(err)
+  }
+}
+
+/* Fetch stats */
+const fetchStats = async () => {
+  try {
+    const res = await api.get('/crawl/site-and-queue-count')
+    if (res.data?.isSuccess) {
+      stats.value = res.data.data
+    }
+  } catch (err) {
+    handleAuthError(err)
+  }
+}
+
+onMounted(() => {
+  fetchCrawlSites()
+  fetchStats()
+})
+
+/* ================= COMPUTED ================= */
+const activeSites = computed(() =>
+  allSites.value.filter(s => s.status === 'Active')
+)
+
+const isAllSelected = computed(() =>
+  activeSites.value.length > 0 &&
+  selectedSites.value.length === activeSites.value.length
+)
+
+/* ================= METHODS ================= */
+const toggleSelectAll = () => {
+  selectedSites.value = isAllSelected.value
+    ? []
+    : activeSites.value.map(s => s.id)
+}
+
+const toggleSiteSelection = (id: number) => {
+  const idx = selectedSites.value.indexOf(id)
+  idx > -1
+    ? selectedSites.value.splice(idx, 1)
+    : selectedSites.value.push(id)
+}
+
+/* ================= CRAWL ================= */
+const queueForCrawl = async () => {
+  if (!selectedSites.value.length) return
 
   try {
-    const payload = { webSiteId: selectedSites.value }
-    const res = await api.post('/crawl/edit', payload)
+    const res = await api.post('/crawl/edit', {
+      webSiteId: selectedSites.value
+    })
 
     if (res.data.isSuccess) {
-      // Update local state to Queue
       selectedSites.value.forEach(id => {
         const site = allSites.value.find(s => s.id === id)
         if (site) site.crawlStatus = 'Queue'
       })
       selectedSites.value = []
+      fetchStats()
       toast.success(res.data.message)
     }
   } catch (err) {
-    toast.error('Failed to queue sites')
-    console.error(err)
+    handleAuthError(err)
   }
 }
 
-  
-  const startCrawl = async (id: number) => {
-  const site = allSites.value.find(s => s.id === id)
-  if (!site) return
-
-  const confirmStart = confirm(
-    `Are you sure you want to start crawling "${site.name}"?`
-  )
-  if (!confirmStart) return
-
+const startCrawl = async (id: number) => {
   try {
-    const payload = { webSiteId: [id] }
-    const res = await api.post('/crawl/edit', payload)
-
+    const res = await api.post('/crawl/edit', { webSiteId: [id] })
     if (res.data.isSuccess) {
-      site.crawlStatus = 'Queue'
+      const site = allSites.value.find(s => s.id === id)
+      if (site) site.crawlStatus = 'Queue'
+      fetchStats()
       toast.success(res.data.message)
     }
   } catch (err) {
-    toast.error('Failed to start crawl')
-    console.error(err)
+    handleAuthError(err)
   }
 }
 
-  
-  /* ================= NAVIGATION ================= */
-  const viewDetails = (id: number) => {
-    router.push({ name: 'CrawlDetails', params: { siteId: id } })
-  }
-  
-  /* ================= UTILITIES ================= */
-  const getStatusClass = (status?: string) =>
-    `status-${(status || 'queue').toLowerCase()}`
-  
-  const formatCrawlDate = (date?: Date) =>
-    date ? date.toLocaleDateString() : 'Never'
-  </script>
+/* ================= UTIL ================= */
+const viewDetails = (id: number) => {
+  router.push({ name: 'CrawlDetails', params: { siteId: id } })
+}
+
+const getStatusClass = (status?: string) =>
+  `status-${(status || 'queue').toLowerCase()}`
+
+const formatCrawlDate = (date?: Date) =>
+  date ? date.toLocaleDateString() : 'Never'
+</script>
+
   
 <style scoped>
   .page-container {

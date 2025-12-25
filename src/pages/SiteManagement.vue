@@ -17,6 +17,7 @@
               <th>URL</th>
               <th>Type</th>
               <th>Status</th>
+              <th>Indexable</th>
               <th>Created</th>
               <th>Actions</th>
             </tr>
@@ -32,6 +33,7 @@
               <td>
                 <span class="status-badge" :class="site.activeStatus.toLowerCase()">{{ site.activeStatus === 'Active' ? 'Active' : 'Inactive' }}</span>
               </td>
+              <td>{{ site.isIndexable }}</td>
               <td>{{ formatDate(site.created) }}</td>
               <td class="action-cell">
                 <button class="action-btn" @click="editSite(site)">Edit</button>
@@ -123,7 +125,8 @@
       type: string
       activeStatus: 'Active' | 'Inactive'
       description: string
-      created: Date
+      created: Date,
+      isIndexable:'Yes' | 'No'
     }
     
     interface FormData {
@@ -144,7 +147,7 @@
       url: '',
       type: '',
       activeStatus: 'Active',
-      description: '',
+      description: ''
     })
     
     /* ============================
@@ -163,6 +166,7 @@
       activeStatus: item.activeStatus ? 'Active' : 'Inactive', // fix here
       description: item.description || '',
       created: new Date(item.createdDate ?? new Date()),
+      isIndexable: item.isIndexable ? 'Yes' : 'No',
     }))
   } catch (err) {
     console.error('Failed to load sites', err)

@@ -17,13 +17,13 @@ function getCookie(name: string): string | null {
    Axios Instances
 ------------------------ */
 const api = axios.create({
-  baseURL: 'https://localhost:7078',
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
 
 const refreshApi = axios.create({
-  baseURL: 'https://localhost:7078',
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   withCredentials: true,
 })
 

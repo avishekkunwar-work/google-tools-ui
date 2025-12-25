@@ -33,6 +33,7 @@
             <th>URL</th>
             <th>Status</th>
             <th>Status Code</th>
+            <th>indexed</th>
             <th>Crawled At</th>
           </tr>
         </thead>
@@ -57,6 +58,7 @@
             </td>
 
             <td class="status-code">{{ item.statusCode }}</td>
+            <td>{{ item.isAlreadyIndexed?'Yes':'No' }}</td>
             <td>{{ item.crawledAt }}</td>
           </tr>
 
@@ -110,7 +112,8 @@
     url: string
     status: 'Success' | 'Failed'
     statusCode: number
-    crawledAt: string
+    crawledAt: string,
+    isAlreadyIndexed:boolean
   }
   
   interface PageInfo {
