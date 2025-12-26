@@ -127,6 +127,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api'
 import { useToast } from 'vue-toastification'
+import Swal from "sweetalert2";
 
 const toast = useToast()
 const router = useRouter()
@@ -229,6 +230,17 @@ const toggleSiteSelection = (id: number) => {
 const queueForCrawl = async () => {
   if (!selectedSites.value.length) return
 
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: "Do you want to crawl the selected sites(s)?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes",
+    cancelButtonText: "No",
+  });
+
+  if (!result.isConfirmed) return
+
   try {
     const res = await api.post('/crawl/edit', {
       webSiteId: selectedSites.value
@@ -250,6 +262,17 @@ const queueForCrawl = async () => {
 
 const startCrawl = async (id: number) => {
   try {
+    const result = await Swal.fire({
+    title: "Are you sure?",
+    text: "Are you sure, you want to crawl this site?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes",
+    cancelButtonText: "No",
+  });
+
+  if (!result.isConfirmed) return
+
     const res = await api.post('/crawl/edit', { webSiteId: [id] })
     if (res.data.isSuccess) {
       const site = allSites.value.find(s => s.id === id)

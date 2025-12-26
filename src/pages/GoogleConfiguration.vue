@@ -173,7 +173,11 @@ const uploadKey = async () => {
   try {
     const fd = new FormData()
     fd.append('file', selectedFile.value)
-    await api.post('/google-config/upload', fd)
+    await api.post('/google-config/upload', fd,{
+      headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+    })
     toast.success('Key uploaded successfully')
     fetchCredentials()
   } finally {
